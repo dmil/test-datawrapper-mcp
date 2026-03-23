@@ -1,8 +1,0 @@
-{
-  "servers": {
-    "datawrapper": {
-      "type": "http",
-      "url": "https://datawrapper-mcp.fly.dev/mcp"
-    }
-  }
-}

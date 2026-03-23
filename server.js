@@ -1,13 +1,12 @@
 import 'dotenv/config';
 import express from 'express';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
 const app = express();
 app.use(express.json());
 app.use(express.static('public'));
 
-const MCP_URL = process.env.MCP_URL || 'https://datawrapper-mcp.fly.dev/mcp';
 const SERVER_OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
 const SERVER_DATAWRAPPER_TOKEN = process.env.DATAWRAPPER_TOKEN || '';
 const DEFAULT_MODEL = process.env.MODEL || 'anthropic/claude-3-haiku';
@@ -23,11 +22,14 @@ const SYSTEM_PROMPT =
 
 async function createMCPClient(datawrapperToken) {
   const client = new Client({ name: 'datawrapper-web', version: '1.0.0' });
-  const requestInit = datawrapperToken
-    ? { headers: { Authorization: `Bearer ${datawrapperToken}` } }
-    : {};
-  const transport = new StreamableHTTPClientTransport(new URL(MCP_URL), {
-    requestInit,
+  const env = { ...process.env };
+  if (datawrapperToken) {
+    env.DATAWRAPPER_ACCESS_TOKEN = datawrapperToken;
+  }
+  const transport = new StdioClientTransport({
+    command: 'uvx',
+    args: ['datawrapper-mcp'],
+    env,
   });
   await client.connect(transport);
   return client;
@@ -158,7 +160,6 @@ async function runAgentLoop(messages, datawrapperToken, openrouterKey, model) {
 app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
-    mcpUrl: MCP_URL,
     defaultModel: DEFAULT_MODEL,
     serverKeyConfigured: Boolean(SERVER_OPENROUTER_API_KEY),
   });
@@ -210,7 +211,7 @@ app.post('/api/chat', async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Datawrapper MCP Web → http://localhost:${PORT}`);
-  console.log(`MCP server          → ${MCP_URL}`);
+  console.log(`MCP server          → uvx datawrapper-mcp (stdio)`);
   console.log(`Default model       → ${DEFAULT_MODEL}`);
   if (!SERVER_OPENROUTER_API_KEY) {
     console.log(
