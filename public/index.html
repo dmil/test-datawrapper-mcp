@@ -66,6 +66,13 @@
       white-space: nowrap;
     }
     .toggle-vis:hover { background: var(--surface); }
+    .mode-toggle { display: flex; gap: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; width: fit-content; }
+    .mode-toggle button {
+      padding: 8px 16px; font-size: .85rem; cursor: pointer; border: none;
+      background: var(--surface); color: var(--muted); font-weight: 600; transition: background .15s, color .15s;
+    }
+    .mode-toggle button.active { background: var(--brand); color: #fff; }
+    .mode-toggle button:not(.active):hover { background: var(--border); }
     .settings-hint { font-size: .78rem; color: var(--muted); }
 
     /* ── Chat area ── */
@@ -129,11 +136,22 @@
     #send-btn:hover:not(:disabled) { background: var(--brand-d); }
     #send-btn:disabled { opacity: .5; cursor: not-allowed; }
 
+    /* Tool results */
+    .tool-result {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+      padding: 10px 14px; font-size: .85rem; line-height: 1.5; margin-bottom: 4px;
+      word-break: break-word;
+    }
+    .tool-result .tool-name {
+      font-size: .72rem; font-weight: 600; color: var(--muted); text-transform: uppercase;
+      letter-spacing: .03em; margin-bottom: 4px;
+    }
+
     /* Images inside bubbles */
     .bubble img { max-width: 100%; border-radius: 8px; margin-top: 8px; }
 
     /* Links inside bubbles */
-    .bubble a { color: var(--brand); text-decoration: underline; }
+    .bubble a, .tool-result a { color: var(--brand); text-decoration: underline; }
     .bubble.user a { color: #d0e8ff; }
 
     /* Scrollbar */
@@ -166,14 +184,23 @@
   <div id="settings-panel" role="region" aria-label="Settings">
     <div class="settings-row">
       <div class="field">
+        <label>Mode</label>
+        <div class="mode-toggle">
+          <button type="button" id="mode-simple" class="active">Simple</button>
+          <button type="button" id="mode-advanced">Advanced</button>
+        </div>
+      </div>
+    </div>
+    <div class="settings-row">
+      <div class="field">
         <label for="openrouter-key">OpenRouter API Key</label>
         <div class="input-toggle">
           <input type="password" id="openrouter-key" data-persist placeholder="Loading from server…" autocomplete="off" />
           <button type="button" class="toggle-vis" data-target="openrouter-key" aria-label="Show/hide key">Show</button>
         </div>
       </div>
-      <div class="field">
-        <label for="dw-token">Datawrapper API Token (optional)</label>
+      <div class="field" id="dw-token-field" style="display:none">
+        <label for="dw-token">Datawrapper API Token</label>
         <div class="input-toggle">
           <input type="password" id="dw-token" data-persist placeholder="Your Datawrapper token" autocomplete="off" />
           <button type="button" class="toggle-vis" data-target="dw-token" aria-label="Show/hide token">Show</button>
@@ -189,6 +216,11 @@
     <p class="settings-hint">
       Keys are stored only in your browser session and are never logged by this server.
       Get a free OpenRouter key at <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a>.
+    </p>
+    <p class="settings-hint" id="mode-hint">
+      <strong>Simple</strong> connects to a hosted Datawrapper MCP server. 
+      <br/>
+      <strong>Advanced</strong> runs the MCP server locally and requires your own Datawrapper API token.
     </p>
   </div>
 
@@ -222,8 +254,12 @@
   const settingsPanel  = document.getElementById('settings-panel');
   const keyEl      = document.getElementById('openrouter-key');
   const dwTokenEl  = document.getElementById('dw-token');
+  const dwTokenField = document.getElementById('dw-token-field');
   const modelEl    = document.getElementById('model-select');
+  const modeSimple = document.getElementById('mode-simple');
+  const modeAdvanced = document.getElementById('mode-advanced');
   const welcomeEl  = document.getElementById('welcome');
+  let currentMode  = sessionStorage.getItem('dw-mcp-mode') || 'simple';
 
   // Restore settings from sessionStorage for all fields marked data-persist
   document.querySelectorAll('[data-persist]').forEach(el => {
@@ -257,6 +293,18 @@
       btn.textContent = showing ? 'Show' : 'Hide';
     });
   });
+
+  // Mode toggle (simple / advanced)
+  function setMode(mode) {
+    currentMode = mode;
+    sessionStorage.setItem('dw-mcp-mode', mode);
+    modeSimple.classList.toggle('active', mode === 'simple');
+    modeAdvanced.classList.toggle('active', mode === 'advanced');
+    dwTokenField.style.display = mode === 'advanced' ? '' : 'none';
+  }
+  modeSimple.addEventListener('click', () => setMode('simple'));
+  modeAdvanced.addEventListener('click', () => setMode('advanced'));
+  setMode(currentMode);
 
   // Conversation history (without system prompt — server adds it)
   let history = [];
@@ -395,12 +443,15 @@
     try {
       const payload = {
         messages: history,
+        mode: currentMode,
         model: modelEl.value,
       };
       const apiKey = keyEl.value.trim();
       if (apiKey) payload.openrouterKey = apiKey;
-      const dwToken = dwTokenEl.value.trim();
-      if (dwToken) payload.datawrapperToken = dwToken;
+      if (currentMode === 'advanced') {
+        const dwToken = dwTokenEl.value.trim();
+        if (dwToken) payload.datawrapperToken = dwToken;
+      }
 
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -416,21 +467,48 @@
         // Remove the failed user message from history so user can retry
         history.pop();
       } else {
-        const reply = data.reply || '';
-        const wrap = appendBubble('ai', reply);
+        // Render tool results
+        if (data.toolResults && data.toolResults.length > 0) {
+          for (const tr of data.toolResults) {
+            const wrap = document.createElement('div');
+            wrap.className = 'bubble-wrap ai';
+            const div = document.createElement('div');
+            div.className = 'tool-result';
+            const nameEl = document.createElement('div');
+            nameEl.className = 'tool-name';
+            nameEl.textContent = tr.tool;
+            div.appendChild(nameEl);
+            const textEl = document.createElement('span');
+            textEl.innerHTML = linkify(tr.text);
+            div.appendChild(textEl);
+            wrap.appendChild(div);
+            chatEl.appendChild(wrap);
+          }
+        }
         // Render any images returned by MCP tools
         if (data.images && data.images.length > 0) {
-          const bubble = wrap.querySelector('.bubble');
+          const imgWrap = document.createElement('div');
+          imgWrap.className = 'bubble-wrap ai';
           for (const img of data.images) {
             const imgEl = document.createElement('img');
             imgEl.src = `data:${img.mimeType};base64,${img.data}`;
             imgEl.alt = 'Chart preview';
-            bubble.appendChild(imgEl);
+            imgEl.style.maxWidth = '100%';
+            imgEl.style.borderRadius = '8px';
+            imgWrap.appendChild(imgEl);
           }
-          chatEl.scrollTop = chatEl.scrollHeight;
+          chatEl.appendChild(imgWrap);
         }
-        // Append the assistant reply to history
-        history.push({ role: 'assistant', content: reply });
+        // Render LLM reply
+        const reply = data.reply || '';
+        if (reply) appendBubble('ai', reply);
+        chatEl.scrollTop = chatEl.scrollHeight;
+        // Use full conversation (includes tool calls/results) so LLM has context on next turn
+        if (data.conversation) {
+          history = data.conversation.filter(m => m.role !== 'system');
+        } else {
+          history.push({ role: 'assistant', content: reply });
+        }
       }
     } catch (err) {
       hideTyping();

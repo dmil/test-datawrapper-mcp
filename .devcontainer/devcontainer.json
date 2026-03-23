@@ -1,6 +1,10 @@
 {
   "name": "Datawrapper MCP",
-  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:20-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/python:1": {}
+  },
+  "postCreateCommand": "npm install && pip install uv",
   "customizations": {
     "vscode": {
       "extensions": [

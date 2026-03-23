@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
 const app = express();
@@ -16,19 +17,35 @@ const PORT = process.env.PORT || 3000;
 const SYSTEM_PROMPT =
   'You are a helpful assistant with access to Datawrapper, a data visualization platform. ' +
   'You can help users create, modify, publish, and manage charts and data visualizations. ' +
-  'When a user asks you to create or change a chart, use the available Datawrapper tools to do so and ' +
-  'share any chart URLs or embed codes you receive back.';
+  'When a user asks you to create or change a chart, use the available Datawrapper tools to do so. ' +
+  'IMPORTANT: When a chart has already been created in this conversation, ALWAYS use edit/update tools with the existing chart ID to modify it. ' +
+  'NEVER create a new chart when the user wants to change an existing one. Track chart IDs from previous tool results. ' +
+  'Always include the edit link in your response.';
+  
 
 // ----- MCP helpers --------------------------------------------------------
 
-async function createMCPClient(datawrapperToken) {
+async function createMCPClient(mode, datawrapperToken) {
   const client = new Client({ name: 'datawrapper-web', version: '1.0.0' });
-  const requestInit = datawrapperToken
-    ? { headers: { Authorization: `Bearer ${datawrapperToken}` } }
-    : {};
-  const transport = new StreamableHTTPClientTransport(new URL(MCP_URL), {
-    requestInit,
-  });
+  let transport;
+  if (mode === 'advanced') {
+    const env = { ...process.env };
+    if (datawrapperToken) {
+      env.DATAWRAPPER_ACCESS_TOKEN = datawrapperToken;
+    }
+    transport = new StdioClientTransport({
+      command: 'uvx',
+      args: ['datawrapper-mcp'],
+      env,
+    });
+  } else {
+    const requestInit = datawrapperToken
+      ? { headers: { Authorization: `Bearer ${datawrapperToken}` } }
+      : {};
+    transport = new StreamableHTTPClientTransport(new URL(MCP_URL), {
+      requestInit,
+    });
+  }
   await client.connect(transport);
   return client;
 }
@@ -69,8 +86,8 @@ function extractContent(content) {
 
 // ----- Agentic loop -------------------------------------------------------
 
-async function runAgentLoop(messages, datawrapperToken, openrouterKey, model) {
-  const client = await createMCPClient(datawrapperToken);
+async function runAgentLoop(messages, mode, datawrapperToken, openrouterKey, model) {
+  const client = await createMCPClient(mode, datawrapperToken);
   try {
     const tools = await listToolsAsOpenAI(client);
     const conversation = [
@@ -79,6 +96,7 @@ async function runAgentLoop(messages, datawrapperToken, openrouterKey, model) {
     ];
 
     const collectedImages = [];
+    const collectedToolResults = [];
     const MAX_AGENT_LOOP_ITERATIONS = 15;
     for (let i = 0; i < MAX_AGENT_LOOP_ITERATIONS; i++) {
       const body = {
@@ -114,7 +132,8 @@ async function runAgentLoop(messages, datawrapperToken, openrouterKey, model) {
 
       // No tool calls — we have the final answer
       if (!message.tool_calls || message.tool_calls.length === 0) {
-        return { reply: message.content, images: collectedImages, conversation };
+        console.log('Final reply:', JSON.stringify(message.content));
+        return { reply: message.content, toolResults: collectedToolResults, images: collectedImages, conversation };
       }
 
       // Execute every tool call and append results
@@ -133,6 +152,8 @@ async function runAgentLoop(messages, datawrapperToken, openrouterKey, model) {
             const { text, images } = extractContent(toolResult.content);
             resultText = text;
             collectedImages.push(...images);
+            collectedToolResults.push({ tool: call.function.name, text: resultText });
+            console.log(`Tool ${call.function.name} result:`, resultText.slice(0, 500));
           } catch (err) {
             resultText = `Tool error: ${err.message}`;
           }
@@ -158,7 +179,6 @@ async function runAgentLoop(messages, datawrapperToken, openrouterKey, model) {
 app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
-    mcpUrl: MCP_URL,
     defaultModel: DEFAULT_MODEL,
     serverKeyConfigured: Boolean(SERVER_OPENROUTER_API_KEY),
   });
@@ -176,6 +196,7 @@ app.post('/api/chat', async (req, res) => {
   try {
     const {
       messages,
+      mode = 'simple',
       datawrapperToken,
       openrouterKey,
       model = DEFAULT_MODEL,
@@ -197,6 +218,7 @@ app.post('/api/chat', async (req, res) => {
 
     const result = await runAgentLoop(
       messages,
+      mode,
       datawrapperToken || SERVER_DATAWRAPPER_TOKEN || null,
       apiKey,
       model
@@ -210,7 +232,7 @@ app.post('/api/chat', async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Datawrapper MCP Web → http://localhost:${PORT}`);
-  console.log(`MCP server          → ${MCP_URL}`);
+  console.log(`MCP server          → uvx datawrapper-mcp (stdio)`);
   console.log(`Default model       → ${DEFAULT_MODEL}`);
   if (!SERVER_OPENROUTER_API_KEY) {
     console.log(
