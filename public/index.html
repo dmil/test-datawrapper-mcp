@@ -199,7 +199,7 @@
       <p>Ask me to create, edit, or publish Datawrapper charts. I'll use the Datawrapper API on your behalf.</p>
       <div class="examples">
         <button class="example-chip">Create a bar chart with sample data</button>
-        <button class="example-chip">List my recent charts</button>
+
         <button class="example-chip">Create a line chart showing monthly sales</button>
         <button class="example-chip">What Datawrapper tools are available?</button>
       </div>
@@ -300,10 +300,27 @@
   }
 
   function linkify(text) {
-    return escapeHtml(text).replace(
-      /(https?:\/\/[^\s<>"]+)/g,
-      '<a href="$1" target="_blank" rel="noopener">$1</a>'
-    );
+    // First, extract markdown links and bare URLs before escaping
+    const tokens = [];
+    let cursor = 0;
+    // Match markdown links [text](url) or bare URLs
+    const re = /\[([^\]]+)\]\((https?:\/\/[^)]+)\)|(https?:\/\/[^\s<>")\]]+)/g;
+    let m;
+    while ((m = re.exec(text)) !== null) {
+      if (m.index > cursor) tokens.push({ type: 'text', value: text.slice(cursor, m.index) });
+      if (m[1]) {
+        tokens.push({ type: 'link', label: m[1], url: m[2] });
+      } else {
+        tokens.push({ type: 'link', label: m[3], url: m[3] });
+      }
+      cursor = re.lastIndex;
+    }
+    if (cursor < text.length) tokens.push({ type: 'text', value: text.slice(cursor) });
+
+    return tokens.map(t => {
+      if (t.type === 'link') return `<a href="${escapeHtml(t.url)}" target="_blank" rel="noopener">${escapeHtml(t.label)}</a>`;
+      return escapeHtml(t.value);
+    }).join('');
   }
 
   function appendBubble(role, text) {
