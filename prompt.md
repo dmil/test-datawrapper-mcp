@@ -1,0 +1,2 @@
+make me a chart using datawrapper
+311 Complaint Breakdown by Borough (Past Week: Feb 27 - Mar 6, 2026) Based on data from the NYC 311 Service Requests dataset (https://data.cityofnewyork.us/Social-Services/311-Service-Requests-from-2020-to-Present/erm2-nwe9/about_data), here's the breakdown of complaint types by borough for the past week: Overall Volume by Borough * Brooklyn: 19,299 complaints (31%) * Queens: 15,597 complaints (25%) * Bronx: 12,678 complaints (20%) * Manhattan: 12,139 complaints (19%) * Staten Island: 2,728 complaints (4%)
