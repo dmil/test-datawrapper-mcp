@@ -499,10 +499,16 @@
           }
           chatEl.appendChild(imgWrap);
         }
-        chatEl.scrollTop = chatEl.scrollHeight;
-        // Append the assistant reply to history
+        // Render LLM reply
         const reply = data.reply || '';
-        history.push({ role: 'assistant', content: reply });
+        if (reply) appendBubble('ai', reply);
+        chatEl.scrollTop = chatEl.scrollHeight;
+        // Use full conversation (includes tool calls/results) so LLM has context on next turn
+        if (data.conversation) {
+          history = data.conversation.filter(m => m.role !== 'system');
+        } else {
+          history.push({ role: 'assistant', content: reply });
+        }
       }
     } catch (err) {
       hideTyping();
