@@ -1,0 +1,200 @@
+import express from 'express';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+
+const app = express();
+app.use(express.json());
+app.use(express.static('public'));
+
+const MCP_URL = process.env.MCP_URL || 'https://datawrapper-mcp.fly.dev/mcp';
+const SERVER_OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
+const DEFAULT_MODEL = process.env.MODEL || 'anthropic/claude-3.5-sonnet';
+const PORT = process.env.PORT || 3000;
+
+const SYSTEM_PROMPT =
+  'You are a helpful assistant with access to Datawrapper, a data visualization platform. ' +
+  'You can help users create, modify, publish, and manage charts and data visualizations. ' +
+  'When a user asks you to create or change a chart, use the available Datawrapper tools to do so and ' +
+  'share any chart URLs or embed codes you receive back.';
+
+// ----- MCP helpers --------------------------------------------------------
+
+async function createMCPClient(datawrapperToken) {
+  const client = new Client({ name: 'datawrapper-web', version: '1.0.0' });
+  const requestInit = datawrapperToken
+    ? { headers: { Authorization: `Bearer ${datawrapperToken}` } }
+    : {};
+  const transport = new StreamableHTTPClientTransport(new URL(MCP_URL), {
+    requestInit,
+  });
+  await client.connect(transport);
+  return client;
+}
+
+async function listToolsAsOpenAI(client) {
+  const result = await client.listTools();
+  return result.tools.map((tool) => ({
+    type: 'function',
+    function: {
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.inputSchema,
+    },
+  }));
+}
+
+function extractTextContent(content) {
+  if (!content) return '';
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((c) => {
+        if (typeof c === 'string') return c;
+        if (c.type === 'text') return c.text;
+        return JSON.stringify(c);
+      })
+      .join('\n');
+  }
+  return JSON.stringify(content);
+}
+
+// ----- Agentic loop -------------------------------------------------------
+
+async function runAgentLoop(messages, datawrapperToken, openrouterKey, model) {
+  const client = await createMCPClient(datawrapperToken);
+  try {
+    const tools = await listToolsAsOpenAI(client);
+    const conversation = [
+      { role: 'system', content: SYSTEM_PROMPT },
+      ...messages,
+    ];
+
+    const MAX_AGENT_LOOP_ITERATIONS = 15;
+    for (let i = 0; i < MAX_AGENT_LOOP_ITERATIONS; i++) {
+      const body = {
+        model,
+        messages: conversation,
+      };
+      if (tools.length > 0) {
+        body.tools = tools;
+      }
+
+      const response = await fetch(
+        'https://openrouter.ai/api/v1/chat/completions',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${openrouterKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': 'https://github.com/dmil/test-datawrapper-mcp',
+            'X-Title': 'Datawrapper MCP Web',
+          },
+          body: JSON.stringify(body),
+        }
+      );
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`OpenRouter error ${response.status}: ${errText}`);
+      }
+
+      const data = await response.json();
+      const message = data.choices[0].message;
+      conversation.push(message);
+
+      // No tool calls — we have the final answer
+      if (!message.tool_calls || message.tool_calls.length === 0) {
+        return { reply: message.content, conversation };
+      }
+
+      // Execute every tool call and append results
+      const toolResults = await Promise.all(
+        message.tool_calls.map(async (call) => {
+          let resultContent;
+          try {
+            const args =
+              typeof call.function.arguments === 'string'
+                ? JSON.parse(call.function.arguments)
+                : call.function.arguments;
+            const toolResult = await client.callTool({
+              name: call.function.name,
+              arguments: args,
+            });
+            resultContent = extractTextContent(toolResult.content);
+          } catch (err) {
+            resultContent = `Tool error: ${err.message}`;
+          }
+          return {
+            role: 'tool',
+            tool_call_id: call.id,
+            content: resultContent,
+          };
+        })
+      );
+
+      conversation.push(...toolResults);
+    }
+
+    throw new Error('Agent loop exceeded maximum iterations without a final reply');
+  } finally {
+    await client.close();
+  }
+}
+
+// ----- Routes -------------------------------------------------------------
+
+app.get('/api/health', (_req, res) => {
+  res.json({
+    status: 'ok',
+    mcpUrl: MCP_URL,
+    defaultModel: DEFAULT_MODEL,
+    serverKeyConfigured: Boolean(SERVER_OPENROUTER_API_KEY),
+  });
+});
+
+app.post('/api/chat', async (req, res) => {
+  try {
+    const {
+      messages,
+      datawrapperToken,
+      openrouterKey,
+      model = DEFAULT_MODEL,
+    } = req.body;
+
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ error: 'messages array is required' });
+    }
+
+    const apiKey = openrouterKey || SERVER_OPENROUTER_API_KEY;
+    if (!apiKey) {
+      return res
+        .status(400)
+        .json({
+          error:
+            'An OpenRouter API key is required. Provide it in the settings panel or ask the server administrator to set OPENROUTER_API_KEY.',
+        });
+    }
+
+    const result = await runAgentLoop(
+      messages,
+      datawrapperToken || null,
+      apiKey,
+      model
+    );
+    res.json(result);
+  } catch (err) {
+    console.error('Chat error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`Datawrapper MCP Web → http://localhost:${PORT}`);
+  console.log(`MCP server          → ${MCP_URL}`);
+  console.log(`Default model       → ${DEFAULT_MODEL}`);
+  if (!SERVER_OPENROUTER_API_KEY) {
+    console.log(
+      'Note: OPENROUTER_API_KEY not set — users must supply their own key.'
+    );
+  }
+});
