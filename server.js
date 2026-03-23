@@ -9,6 +9,7 @@ app.use(express.static('public'));
 
 const MCP_URL = process.env.MCP_URL || 'https://datawrapper-mcp.fly.dev/mcp';
 const SERVER_OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
+const SERVER_DATAWRAPPER_TOKEN = process.env.DATAWRAPPER_TOKEN || '';
 const DEFAULT_MODEL = process.env.MODEL || 'anthropic/claude-3-haiku';
 const PORT = process.env.PORT || 3000;
 
@@ -166,6 +167,7 @@ app.get('/api/health', (_req, res) => {
 app.get('/api/config', (_req, res) => {
   res.json({
     openrouterKey: SERVER_OPENROUTER_API_KEY || '',
+    datawrapperToken: SERVER_DATAWRAPPER_TOKEN || '',
     defaultModel: DEFAULT_MODEL,
   });
 });
@@ -195,7 +197,7 @@ app.post('/api/chat', async (req, res) => {
 
     const result = await runAgentLoop(
       messages,
-      datawrapperToken || null,
+      datawrapperToken || SERVER_DATAWRAPPER_TOKEN || null,
       apiKey,
       model
     );

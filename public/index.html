@@ -55,9 +55,17 @@
     .field input, .field select {
       border: 1px solid var(--border); border-radius: 8px;
       padding: 8px 10px; font-size: .9rem; outline: none;
-      background: var(--surface);
+      background: var(--surface); width: 100%;
     }
     .field input:focus, .field select:focus { border-color: var(--brand); background: #fff; }
+    .input-toggle { display: flex; gap: 6px; align-items: center; }
+    .input-toggle input { flex: 1; }
+    .toggle-vis {
+      background: none; border: 1px solid var(--border); border-radius: 8px;
+      padding: 8px 10px; font-size: .78rem; cursor: pointer; color: var(--muted);
+      white-space: nowrap;
+    }
+    .toggle-vis:hover { background: var(--surface); }
     .settings-hint { font-size: .78rem; color: var(--muted); }
 
     /* ── Chat area ── */
@@ -159,21 +167,22 @@
     <div class="settings-row">
       <div class="field">
         <label for="openrouter-key">OpenRouter API Key</label>
-        <input type="password" id="openrouter-key" data-persist placeholder="Loading from server…" autocomplete="off" />
+        <div class="input-toggle">
+          <input type="password" id="openrouter-key" data-persist placeholder="Loading from server…" autocomplete="off" />
+          <button type="button" class="toggle-vis" data-target="openrouter-key" aria-label="Show/hide key">Show</button>
+        </div>
       </div>
       <div class="field">
         <label for="dw-token">Datawrapper API Token (optional)</label>
-        <input type="password" id="dw-token" data-persist placeholder="Your Datawrapper token" autocomplete="off" />
+        <div class="input-toggle">
+          <input type="password" id="dw-token" data-persist placeholder="Your Datawrapper token" autocomplete="off" />
+          <button type="button" class="toggle-vis" data-target="dw-token" aria-label="Show/hide token">Show</button>
+        </div>
       </div>
       <div class="field">
         <label for="model-select">Model</label>
         <select id="model-select" data-persist>
-          <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet</option>
-          <option value="anthropic/claude-3-haiku">Claude 3 Haiku (faster)</option>
-          <option value="openai/gpt-4o">GPT-4o</option>
-          <option value="openai/gpt-4o-mini">GPT-4o Mini (faster)</option>
-          <option value="google/gemini-flash-1.5">Gemini 1.5 Flash</option>
-          <option value="mistralai/mistral-large">Mistral Large</option>
+          <option value="anthropic/claude-3-haiku">Claude 3 Haiku</option>
         </select>
       </div>
     </div>
@@ -233,10 +242,21 @@
       keyEl.value = config.openrouterKey;
       sessionStorage.setItem('dw-mcp-openrouter-key', config.openrouterKey);
     }
-    if (config.defaultModel && !sessionStorage.getItem('dw-mcp-model-select')) {
-      modelEl.value = config.defaultModel;
+    if (config.datawrapperToken && !dwTokenEl.value) {
+      dwTokenEl.value = config.datawrapperToken;
+      sessionStorage.setItem('dw-mcp-dw-token', config.datawrapperToken);
     }
   }).catch(() => {});
+
+  // Toggle password visibility
+  document.querySelectorAll('.toggle-vis').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const input = document.getElementById(btn.dataset.target);
+      const showing = input.type === 'text';
+      input.type = showing ? 'password' : 'text';
+      btn.textContent = showing ? 'Show' : 'Hide';
+    });
+  });
 
   // Conversation history (without system prompt — server adds it)
   let history = [];
