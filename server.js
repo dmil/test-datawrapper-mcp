@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
@@ -8,7 +9,7 @@ app.use(express.static('public'));
 
 const MCP_URL = process.env.MCP_URL || 'https://datawrapper-mcp.fly.dev/mcp';
 const SERVER_OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
-const DEFAULT_MODEL = process.env.MODEL || 'anthropic/claude-3.5-sonnet';
+const DEFAULT_MODEL = process.env.MODEL || 'anthropic/claude-3-haiku';
 const PORT = process.env.PORT || 3000;
 
 const SYSTEM_PROMPT =
@@ -43,19 +44,26 @@ async function listToolsAsOpenAI(client) {
   }));
 }
 
-function extractTextContent(content) {
-  if (!content) return '';
-  if (typeof content === 'string') return content;
+function extractContent(content) {
+  const texts = [];
+  const images = [];
+  if (!content) return { text: '', images };
+  if (typeof content === 'string') return { text: content, images };
   if (Array.isArray(content)) {
-    return content
-      .map((c) => {
-        if (typeof c === 'string') return c;
-        if (c.type === 'text') return c.text;
-        return JSON.stringify(c);
-      })
-      .join('\n');
+    for (const c of content) {
+      if (typeof c === 'string') {
+        texts.push(c);
+      } else if (c.type === 'text') {
+        texts.push(c.text);
+      } else if (c.type === 'image') {
+        images.push({ mimeType: c.mimeType, data: c.data });
+      } else {
+        texts.push(JSON.stringify(c));
+      }
+    }
+    return { text: texts.join('\n'), images };
   }
-  return JSON.stringify(content);
+  return { text: JSON.stringify(content), images };
 }
 
 // ----- Agentic loop -------------------------------------------------------
@@ -69,6 +77,7 @@ async function runAgentLoop(messages, datawrapperToken, openrouterKey, model) {
       ...messages,
     ];
 
+    const collectedImages = [];
     const MAX_AGENT_LOOP_ITERATIONS = 15;
     for (let i = 0; i < MAX_AGENT_LOOP_ITERATIONS; i++) {
       const body = {
@@ -104,13 +113,13 @@ async function runAgentLoop(messages, datawrapperToken, openrouterKey, model) {
 
       // No tool calls — we have the final answer
       if (!message.tool_calls || message.tool_calls.length === 0) {
-        return { reply: message.content, conversation };
+        return { reply: message.content, images: collectedImages, conversation };
       }
 
       // Execute every tool call and append results
       const toolResults = await Promise.all(
         message.tool_calls.map(async (call) => {
-          let resultContent;
+          let resultText;
           try {
             const args =
               typeof call.function.arguments === 'string'
@@ -120,14 +129,16 @@ async function runAgentLoop(messages, datawrapperToken, openrouterKey, model) {
               name: call.function.name,
               arguments: args,
             });
-            resultContent = extractTextContent(toolResult.content);
+            const { text, images } = extractContent(toolResult.content);
+            resultText = text;
+            collectedImages.push(...images);
           } catch (err) {
-            resultContent = `Tool error: ${err.message}`;
+            resultText = `Tool error: ${err.message}`;
           }
           return {
             role: 'tool',
             tool_call_id: call.id,
-            content: resultContent,
+            content: resultText,
           };
         })
       );
@@ -149,6 +160,13 @@ app.get('/api/health', (_req, res) => {
     mcpUrl: MCP_URL,
     defaultModel: DEFAULT_MODEL,
     serverKeyConfigured: Boolean(SERVER_OPENROUTER_API_KEY),
+  });
+});
+
+app.get('/api/config', (_req, res) => {
+  res.json({
+    openrouterKey: SERVER_OPENROUTER_API_KEY || '',
+    defaultModel: DEFAULT_MODEL,
   });
 });
 

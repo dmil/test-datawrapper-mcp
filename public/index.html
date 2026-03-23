@@ -121,6 +121,9 @@
     #send-btn:hover:not(:disabled) { background: var(--brand-d); }
     #send-btn:disabled { opacity: .5; cursor: not-allowed; }
 
+    /* Images inside bubbles */
+    .bubble img { max-width: 100%; border-radius: 8px; margin-top: 8px; }
+
     /* Links inside bubbles */
     .bubble a { color: var(--brand); text-decoration: underline; }
     .bubble.user a { color: #d0e8ff; }
@@ -156,7 +159,7 @@
     <div class="settings-row">
       <div class="field">
         <label for="openrouter-key">OpenRouter API Key</label>
-        <input type="password" id="openrouter-key" data-persist placeholder="sk-or-…  (leave blank if pre-configured)" autocomplete="off" />
+        <input type="password" id="openrouter-key" data-persist placeholder="Loading from server…" autocomplete="off" />
       </div>
       <div class="field">
         <label for="dw-token">Datawrapper API Token (optional)</label>
@@ -223,6 +226,17 @@
       el.addEventListener('input', () => sessionStorage.setItem(key, el.value));
     }
   });
+
+  // Load server config and pre-populate API key if not already set by user
+  fetch('/api/config').then(r => r.json()).then(config => {
+    if (config.openrouterKey && !keyEl.value) {
+      keyEl.value = config.openrouterKey;
+      sessionStorage.setItem('dw-mcp-openrouter-key', config.openrouterKey);
+    }
+    if (config.defaultModel && !sessionStorage.getItem('dw-mcp-model-select')) {
+      modelEl.value = config.defaultModel;
+    }
+  }).catch(() => {});
 
   // Conversation history (without system prompt — server adds it)
   let history = [];
@@ -366,7 +380,18 @@
         history.pop();
       } else {
         const reply = data.reply || '';
-        appendBubble('ai', reply);
+        const wrap = appendBubble('ai', reply);
+        // Render any images returned by MCP tools
+        if (data.images && data.images.length > 0) {
+          const bubble = wrap.querySelector('.bubble');
+          for (const img of data.images) {
+            const imgEl = document.createElement('img');
+            imgEl.src = `data:${img.mimeType};base64,${img.data}`;
+            imgEl.alt = 'Chart preview';
+            bubble.appendChild(imgEl);
+          }
+          chatEl.scrollTop = chatEl.scrollHeight;
+        }
         // Append the assistant reply to history
         history.push({ role: 'assistant', content: reply });
       }
