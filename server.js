@@ -166,8 +166,8 @@ app.get('/api/health', (_req, res) => {
 
 app.get('/api/config', (_req, res) => {
   res.json({
-    openrouterKey: SERVER_OPENROUTER_API_KEY || '',
-    datawrapperToken: SERVER_DATAWRAPPER_TOKEN || '',
+    hasOpenrouterKey: Boolean(SERVER_OPENROUTER_API_KEY),
+    hasDatawrapperToken: Boolean(SERVER_DATAWRAPPER_TOKEN),
     defaultModel: DEFAULT_MODEL,
   });
 });

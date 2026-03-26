@@ -236,15 +236,13 @@
     }
   });
 
-  // Load server config and pre-populate API key if not already set by user
+  // Load server config and show placeholder if server-side keys are configured
   fetch('/api/config').then(r => r.json()).then(config => {
-    if (config.openrouterKey && !keyEl.value) {
-      keyEl.value = config.openrouterKey;
-      sessionStorage.setItem('dw-mcp-openrouter-key', config.openrouterKey);
+    if (config.hasOpenrouterKey && !keyEl.value) {
+      keyEl.placeholder = 'Provided by server';
     }
-    if (config.datawrapperToken && !dwTokenEl.value) {
-      dwTokenEl.value = config.datawrapperToken;
-      sessionStorage.setItem('dw-mcp-dw-token', config.datawrapperToken);
+    if (config.hasDatawrapperToken && !dwTokenEl.value) {
+      dwTokenEl.placeholder = 'Provided by server';
     }
   }).catch(() => {});
 
