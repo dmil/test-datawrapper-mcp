@@ -256,6 +256,9 @@
         <label for="model-select">Model</label>
         <select id="model-select" data-persist>
           <option value="anthropic/claude-3-haiku">Claude 3 Haiku</option>
+          <option value="qwen/qwen3-coder-next">Qwen3 Coder Next</option>
+          <option value="google/gemini-2.5-flash">Gemini 2.5 Flash</option>
+          <option value="nvidia/nemotron-3-super-120b-a12b">Nemotron 3 Super 120B</option>
         </select>
       </div>
     </div>
@@ -359,13 +362,17 @@
     cumBar.classList.add('visible');
   }
 
-  function createUsageStats(u) {
-    if (!u || !u.total_tokens) return null;
+  function createUsageStats(u, elapsed) {
+    if ((!u || !u.total_tokens) && !elapsed) return null;
     const div = document.createElement('div');
     div.className = 'usage-stats';
-    div.innerHTML =
-      `<span>Tokens: ${(u.prompt_tokens||0).toLocaleString()} in / ${(u.completion_tokens||0).toLocaleString()} out</span>` +
-      (u.cost ? `<span>Cost: ${formatCost(u.cost)}</span>` : '');
+    let html = '';
+    if (elapsed) html += `<span>${elapsed}s</span>`;
+    if (u && u.total_tokens) {
+      html += `<span>Tokens: ${(u.prompt_tokens||0).toLocaleString()} in / ${(u.completion_tokens||0).toLocaleString()} out</span>`;
+      if (u.cost) html += `<span>Cost: ${formatCost(u.cost)}</span>`;
+    }
+    div.innerHTML = html;
     return div;
   }
 
@@ -579,6 +586,7 @@
       const dwToken = dwTokenEl.value.trim();
       if (dwToken) payload.datawrapperToken = dwToken;
 
+      const t0 = performance.now();
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -586,6 +594,7 @@
       });
 
       const data = await res.json();
+      const elapsed = ((performance.now() - t0) / 1000).toFixed(1);
       hideTyping();
 
       if (!res.ok) {
@@ -612,11 +621,9 @@
           chatEl.scrollTop = chatEl.scrollHeight;
         }
         // Show per-message usage stats
-        if (data.usage) {
-          const statsEl = createUsageStats(data.usage);
-          if (statsEl) wrap.appendChild(statsEl);
-          updateCumulativeUsage(data.usage);
-        }
+        const statsEl = createUsageStats(data.usage, elapsed);
+        if (statsEl) wrap.appendChild(statsEl);
+        if (data.usage) updateCumulativeUsage(data.usage);
         // Keep the full server-returned conversation so follow-up turns retain
         // tool calls and tool responses such as chart IDs.
         if (Array.isArray(data.conversation) && data.conversation.length > 0) {
