@@ -80,11 +80,41 @@
 
     .bubble {
       max-width: 76%; padding: 12px 16px; border-radius: var(--radius);
-      line-height: 1.6; font-size: .93rem; white-space: pre-wrap; word-break: break-word;
+      line-height: 1.6; font-size: .93rem; word-break: break-word;
     }
-    .bubble.user { background: var(--user-bg); color: #fff; border-bottom-right-radius: 4px; }
-    .bubble.ai   { background: var(--ai-bg); border: 1px solid var(--border); border-bottom-left-radius: 4px; box-shadow: var(--shadow); }
-    .bubble.error { background: #fff0f0; border-color: #f5a0a0; color: #b91c1c; }
+    .bubble.user { background: var(--user-bg); color: #fff; border-bottom-right-radius: 4px; white-space: pre-wrap; }
+    .bubble.ai   { background: var(--ai-bg); border: 1px solid var(--border); border-bottom-left-radius: 4px; box-shadow: var(--shadow); white-space: normal; }
+    .bubble.error { background: #fff0f0; border-color: #f5a0a0; color: #b91c1c; white-space: pre-wrap; }
+
+    .bubble.ai > *:first-child { margin-top: 0; }
+    .bubble.ai > *:last-child { margin-bottom: 0; }
+    .bubble.ai p,
+    .bubble.ai ul,
+    .bubble.ai ol,
+    .bubble.ai pre,
+    .bubble.ai blockquote,
+    .bubble.ai h1,
+    .bubble.ai h2,
+    .bubble.ai h3,
+    .bubble.ai h4 { margin: 0 0 12px; }
+    .bubble.ai ul,
+    .bubble.ai ol { padding-left: 20px; }
+    .bubble.ai li + li { margin-top: 4px; }
+    .bubble.ai code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace;
+      background: #eef3f8; border-radius: 6px; padding: 1px 5px;
+      font-size: .88em;
+    }
+    .bubble.ai pre {
+      background: #0f172a; color: #e2e8f0; padding: 12px 14px;
+      border-radius: 10px; overflow-x: auto;
+    }
+    .bubble.ai pre code {
+      background: transparent; color: inherit; padding: 0; border-radius: 0;
+    }
+    .bubble.ai blockquote {
+      border-left: 3px solid var(--border); padding-left: 12px; color: var(--muted);
+    }
 
     .sender { font-size: .72rem; color: var(--muted); margin-bottom: 4px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
 
@@ -242,6 +272,8 @@
 
 </div>
 
+<script src="/vendor/marked/marked.umd.js"></script>
+<script src="/vendor/dompurify/purify.min.js"></script>
 <script>
   const chatEl     = document.getElementById('chat');
   const inputEl    = document.getElementById('user-input');
@@ -349,6 +381,26 @@
     }).join('');
   }
 
+  function renderMarkdown(text) {
+    if (!text) return '';
+    if (!window.marked || !window.DOMPurify) {
+      return linkify(text).replace(/\n/g, '<br>');
+    }
+
+    const rendered = window.marked.parse(text, {
+      breaks: true,
+      gfm: true,
+    });
+    const sanitized = window.DOMPurify.sanitize(rendered);
+    const template = document.createElement('template');
+    template.innerHTML = sanitized;
+    template.content.querySelectorAll('a').forEach((anchor) => {
+      anchor.target = '_blank';
+      anchor.rel = 'noopener';
+    });
+    return template.innerHTML;
+  }
+
   function appendBubble(role, text) {
     const wrap = document.createElement('div');
     wrap.className = `bubble-wrap ${role === 'user' ? 'user' : 'ai'}`;
@@ -361,7 +413,7 @@
     const bubble = document.createElement('div');
     bubble.className = `bubble ${role === 'user' ? 'user' : 'ai'}`;
     if (role === 'error') bubble.classList.add('error');
-    bubble.innerHTML = linkify(text);
+    bubble.innerHTML = role === 'ai' ? renderMarkdown(text) : linkify(text);
     wrap.appendChild(bubble);
 
     chatEl.appendChild(wrap);
@@ -388,7 +440,7 @@
     `;
     const resultBtn = document.createElement('button');
     resultBtn.className = 'args-toggle';
-    resultBtn.textContent = failed ? 'Show result' : 'Hide result';
+    resultBtn.textContent = 'Show MCP response';
     const btns = document.createElement('div');
     btns.className = 'tool-call-btns';
     btns.appendChild(argsBtn);
@@ -406,11 +458,11 @@
     wrap.appendChild(argsSection);
 
     const resultSection = document.createElement('div');
-    resultSection.className = `tool-call-result${failed ? ' collapsed' : ''}`;
-    resultSection.innerHTML = `<div class="tool-call-section"><div class="tool-call-label">Result</div><div class="tool-call-pre">${linkify(result)}</div></div>`;
+    resultSection.className = 'tool-call-result collapsed';
+    resultSection.innerHTML = `<div class="tool-call-section"><div class="tool-call-label">MCP Response</div><div class="tool-call-pre">${linkify(result)}</div></div>`;
     resultBtn.addEventListener('click', () => {
       const hidden = resultSection.classList.toggle('collapsed');
-      resultBtn.textContent = hidden ? 'Show result' : 'Hide result';
+      resultBtn.textContent = hidden ? 'Show MCP response' : 'Hide MCP response';
     });
     wrap.appendChild(resultSection);
 
@@ -509,8 +561,13 @@
           }
           chatEl.scrollTop = chatEl.scrollHeight;
         }
-        // Append the assistant reply to history
-        history.push({ role: 'assistant', content: reply });
+        // Keep the full server-returned conversation so follow-up turns retain
+        // tool calls and tool responses such as chart IDs.
+        if (Array.isArray(data.conversation) && data.conversation.length > 0) {
+          history = data.conversation.filter((message) => message.role !== 'system');
+        } else {
+          history.push({ role: 'assistant', content: reply });
+        }
       }
     } catch (err) {
       hideTyping();

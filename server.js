@@ -6,6 +6,8 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 const app = express();
 app.use(express.json());
 app.use(express.static('public'));
+app.use('/vendor/marked', express.static('node_modules/marked/lib'));
+app.use('/vendor/dompurify', express.static('node_modules/dompurify/dist'));
 
 const MCP_URL = process.env.MCP_URL || 'https://datawrapper-mcp.fly.dev/mcp';
 const SERVER_OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
