@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Datawrapper MCP Chat</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --brand:   #1a7abf;
+      --brand-d: #155e96;
+      --surface: #f5f7fa;
+      --border:  #d8dde6;
+      --text:    #1c2333;
+      --muted:   #6b7280;
+      --user-bg: #1a7abf;
+      --ai-bg:   #ffffff;
+      --shadow:  0 2px 12px rgba(0,0,0,.08);
+      --radius:  12px;
+    }
+
+    html, body { height: 100%; font-family: system-ui, -apple-system, sans-serif; background: var(--surface); color: var(--text); }
+
+    /* ── Layout ── */
+    .app { display: flex; flex-direction: column; height: 100vh; max-width: 860px; margin: 0 auto; }
+
+    /* ── Header ── */
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 20px;
+      background: #fff; border-bottom: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      gap: 12px;
+    }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    header h1 { font-size: 1.1rem; font-weight: 700; color: var(--text); }
+    header .logo { width: 28px; height: 28px; }
+    .settings-btn {
+      background: none; border: 1px solid var(--border); border-radius: 8px;
+      padding: 6px 12px; cursor: pointer; font-size: .85rem; color: var(--muted);
+      display: flex; align-items: center; gap: 6px;
+    }
+    .settings-btn:hover { background: var(--surface); }
+
+    /* ── Settings panel ── */
+    #settings-panel {
+      background: #fff; border-bottom: 1px solid var(--border);
+      padding: 16px 20px; display: none; flex-direction: column; gap: 12px;
+    }
+    #settings-panel.open { display: flex; }
+    .settings-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+    .field { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 200px; }
+    .field label { font-size: .78rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+    .field input, .field select {
+      border: 1px solid var(--border); border-radius: 8px;
+      padding: 8px 10px; font-size: .9rem; outline: none;
+      background: var(--surface); width: 100%;
+    }
+    .field input:focus, .field select:focus { border-color: var(--brand); background: #fff; }
+    .input-toggle { display: flex; gap: 6px; align-items: center; }
+    .input-toggle input { flex: 1; }
+    .toggle-vis {
+      background: none; border: 1px solid var(--border); border-radius: 8px;
+      padding: 8px 10px; font-size: .78rem; cursor: pointer; color: var(--muted);
+      white-space: nowrap;
+    }
+    .toggle-vis:hover { background: var(--surface); }
+    .settings-hint { font-size: .78rem; color: var(--muted); }
+
+    /* ── Chat area ── */
+    #chat {
+      flex: 1; overflow-y: auto; padding: 20px;
+      display: flex; flex-direction: column; gap: 16px;
+    }
+
+    .bubble-wrap { display: flex; flex-direction: column; }
+    .bubble-wrap.user { align-items: flex-end; }
+    .bubble-wrap.ai   { align-items: flex-start; }
+
+    .bubble {
+      max-width: 76%; padding: 12px 16px; border-radius: var(--radius);
+      line-height: 1.6; font-size: .93rem; word-break: break-word;
+    }
+    .bubble.user { background: var(--user-bg); color: #fff; border-bottom-right-radius: 4px; white-space: pre-wrap; }
+    .bubble.ai   { background: var(--ai-bg); border: 1px solid var(--border); border-bottom-left-radius: 4px; box-shadow: var(--shadow); white-space: normal; }
+    .bubble.error { background: #fff0f0; border-color: #f5a0a0; color: #b91c1c; white-space: pre-wrap; }
+
+    .bubble.ai > *:first-child { margin-top: 0; }
+    .bubble.ai > *:last-child { margin-bottom: 0; }
+    .bubble.ai p,
+    .bubble.ai ul,
+    .bubble.ai ol,
+    .bubble.ai pre,
+    .bubble.ai blockquote,
+    .bubble.ai h1,
+    .bubble.ai h2,
+    .bubble.ai h3,
+    .bubble.ai h4 { margin: 0 0 12px; }
+    .bubble.ai ul,
+    .bubble.ai ol { padding-left: 20px; }
+    .bubble.ai li + li { margin-top: 4px; }
+    .bubble.ai code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace;
+      background: #eef3f8; border-radius: 6px; padding: 1px 5px;
+      font-size: .88em;
+    }
+    .bubble.ai pre {
+      background: #0f172a; color: #e2e8f0; padding: 12px 14px;
+      border-radius: 10px; overflow-x: auto;
+    }
+    .bubble.ai pre code {
+      background: transparent; color: inherit; padding: 0; border-radius: 0;
+    }
+    .bubble.ai blockquote {
+      border-left: 3px solid var(--border); padding-left: 12px; color: var(--muted);
+    }
+
+    .sender { font-size: .72rem; color: var(--muted); margin-bottom: 4px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+
+    /* Typing indicator */
+    .typing { display: flex; align-items: center; gap: 5px; padding: 12px 16px; }
+    .dot { width: 8px; height: 8px; background: var(--muted); border-radius: 50%; animation: bounce .9s infinite; }
+    .dot:nth-child(2) { animation-delay: .15s; }
+    .dot:nth-child(3) { animation-delay: .3s; }
+    @keyframes bounce { 0%,80%,100%{transform:scale(1);opacity:.5} 40%{transform:scale(1.3);opacity:1} }
+
+    /* Welcome message */
+    .welcome {
+      text-align: center; padding: 40px 20px; color: var(--muted);
+    }
+    .welcome h2 { font-size: 1.3rem; color: var(--text); margin-bottom: 8px; }
+    .welcome p  { font-size: .9rem; line-height: 1.7; max-width: 480px; margin: 0 auto; }
+    .examples { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 20px; }
+    .example-chip {
+      background: #fff; border: 1px solid var(--border); border-radius: 20px;
+      padding: 6px 14px; font-size: .83rem; cursor: pointer; color: var(--brand);
+      transition: background .15s, border-color .15s;
+    }
+    .example-chip:hover { background: var(--brand); color: #fff; border-color: var(--brand); }
+
+    /* ── Input bar ── */
+    .input-bar {
+      padding: 14px 20px; background: #fff; border-top: 1px solid var(--border);
+      display: flex; gap: 10px; align-items: flex-end;
+    }
+    #user-input {
+      flex: 1; border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 10px 14px; font-size: .93rem; resize: none; outline: none;
+      max-height: 140px; min-height: 44px; line-height: 1.5; font-family: inherit;
+      background: var(--surface);
+    }
+    #user-input:focus { border-color: var(--brand); background: #fff; }
+    #send-btn {
+      background: var(--brand); color: #fff; border: none; border-radius: var(--radius);
+      padding: 10px 18px; font-size: .93rem; font-weight: 600; cursor: pointer;
+      height: 44px; white-space: nowrap; transition: background .15s;
+    }
+    #send-btn:hover:not(:disabled) { background: var(--brand-d); }
+    #send-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* Images inside bubbles */
+    .bubble img { max-width: 100%; border-radius: 8px; margin-top: 8px; }
+
+    /* Links inside bubbles */
+    .bubble a { color: var(--brand); text-decoration: underline; }
+    .bubble.user a { color: #d0e8ff; }
+
+    /* Tool call bubbles */
+    .tool-call {
+      align-self: flex-start; width: 76%;
+      border: 1px solid var(--border); border-radius: var(--radius);
+      background: #f8fafc; font-size: .82rem;
+    }
+    .tool-call-header {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 12px; color: var(--muted); font-weight: 600;
+      border-radius: var(--radius) var(--radius) 0 0;
+    }
+    .tool-call-name { color: var(--brand); font-family: monospace; }
+    .tool-call-btns { display: flex; gap: 6px; margin-left: auto; }
+    .args-toggle {
+      background: none; border: 1px solid var(--border);
+      border-radius: 6px; padding: 2px 8px; font-size: .75rem; cursor: pointer;
+      color: var(--muted); white-space: nowrap;
+    }
+    .args-toggle:hover { background: #eef1f5; }
+    .tool-call-args { display: none; border-top: 1px solid var(--border); }
+    .tool-call-args.open { display: block; }
+    .tool-call-result { border-top: 1px solid var(--border); }
+    .tool-call-result.collapsed { display: none; }
+    .tool-status { flex-shrink: 0; }
+    .tool-call-section { padding: 8px 12px; }
+    .tool-call-label { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-bottom: 4px; }
+    .tool-call-pre { white-space: pre-wrap; word-break: break-all; font-family: monospace; font-size: .8rem; color: var(--text); }
+    .tool-call-pre a { color: var(--brand); text-decoration: underline; }
+
+    /* Scrollbar */
+    #chat::-webkit-scrollbar { width: 6px; }
+    #chat::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <header>
+    <div class="header-left">
+      <svg class="logo" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <rect width="32" height="32" rx="8" fill="#1a7abf"/>
+        <rect x="6" y="18" width="4" height="8" rx="1" fill="#fff"/>
+        <rect x="12" y="12" width="4" height="14" rx="1" fill="#fff"/>
+        <rect x="18" y="8" width="4" height="18" rx="1" fill="#fff"/>
+        <rect x="24" y="14" width="4" height="12" rx="1" fill="#fff"/>
+      </svg>
+      <h1>Datawrapper MCP Chat</h1>
+    </div>
+    <button class="settings-btn" id="settings-toggle" aria-expanded="false" aria-controls="settings-panel">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Settings
+    </button>
+  </header>
+
+  <!-- Settings panel -->
+  <div id="settings-panel" role="region" aria-label="Settings">
+    <div class="settings-row">
+      <div class="field">
+        <label for="openrouter-key">OpenRouter API Key</label>
+        <div class="input-toggle">
+          <input type="password" id="openrouter-key" data-persist placeholder="Loading from server…" autocomplete="off" />
+          <button type="button" class="toggle-vis" data-target="openrouter-key" aria-label="Show/hide key">Show</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="dw-token">Datawrapper API Token</label>
+        <div class="input-toggle">
+          <input type="password" id="dw-token" data-persist placeholder="Your Datawrapper token" autocomplete="off" />
+          <button type="button" class="toggle-vis" data-target="dw-token" aria-label="Show/hide token">Show</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="model-select">Model</label>
+        <select id="model-select" data-persist>
+          <option value="anthropic/claude-3-haiku">Claude 3 Haiku</option>
+        </select>
+      </div>
+    </div>
+    <p class="settings-hint">
+      Keys are stored only in your browser session and are never logged by this server.
+    </p>
+  </div>
+
+  <!-- Chat messages -->
+  <div id="chat" role="log" aria-live="polite" aria-label="Chat messages">
+    <div class="welcome" id="welcome">
+      <h2>👋 Welcome to Datawrapper MCP</h2>
+      <p>Ask me to create, edit, or publish Datawrapper charts. I'll use the Datawrapper API on your behalf.</p>
+      <div class="examples">
+        <button class="example-chip">Create a bar chart with sample data</button>
+
+        <button class="example-chip">Create a line chart showing monthly sales</button>
+        <button class="example-chip">What Datawrapper tools are available?</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Input bar -->
+  <div class="input-bar">
+    <textarea id="user-input" rows="1" placeholder="Ask me to create a chart…" aria-label="Message input"></textarea>
+    <button id="send-btn">Send</button>
+  </div>
+
+</div>
+
+<script src="/vendor/marked/marked.umd.js"></script>
+<script src="/vendor/dompurify/purify.min.js"></script>
+<script>
+  const chatEl     = document.getElementById('chat');
+  const inputEl    = document.getElementById('user-input');
+  const sendBtn    = document.getElementById('send-btn');
+  const settingsToggle = document.getElementById('settings-toggle');
+  const settingsPanel  = document.getElementById('settings-panel');
+  const keyEl      = document.getElementById('openrouter-key');
+  const dwTokenEl  = document.getElementById('dw-token');
+  const modelEl    = document.getElementById('model-select');
+  const welcomeEl  = document.getElementById('welcome');
+
+  // Restore settings from sessionStorage for all fields marked data-persist
+  document.querySelectorAll('[data-persist]').forEach(el => {
+    const key = 'dw-mcp-' + el.id;
+    const saved = sessionStorage.getItem(key);
+    if (saved) el.value = saved;
+    el.addEventListener('change', () => sessionStorage.setItem(key, el.value));
+    if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') {
+      el.addEventListener('input', () => sessionStorage.setItem(key, el.value));
+    }
+  });
+
+  // Load server config and show placeholder if server-side keys are configured
+  fetch('/api/config').then(r => r.json()).then(config => {
+    if (config.hasOpenrouterKey && !keyEl.value) {
+      keyEl.placeholder = 'Provided by server';
+    }
+    if (config.hasDatawrapperToken && !dwTokenEl.value) {
+      dwTokenEl.placeholder = 'Provided by server';
+    }
+  }).catch(() => {});
+
+  // Toggle password visibility
+  document.querySelectorAll('.toggle-vis').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const input = document.getElementById(btn.dataset.target);
+      const showing = input.type === 'text';
+      input.type = showing ? 'password' : 'text';
+      btn.textContent = showing ? 'Show' : 'Hide';
+    });
+  });
+
+  // Conversation history (without system prompt — server adds it)
+  let history = [];
+
+  // ── Settings toggle ──────────────────────────────────────────────────────
+  settingsToggle.addEventListener('click', () => {
+    const open = settingsPanel.classList.toggle('open');
+    settingsToggle.setAttribute('aria-expanded', open);
+  });
+
+  // ── Auto-resize textarea ─────────────────────────────────────────────────
+  inputEl.addEventListener('input', () => {
+    inputEl.style.height = 'auto';
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 140) + 'px';
+  });
+
+  // ── Example chips ────────────────────────────────────────────────────────
+  document.querySelectorAll('.example-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      inputEl.value = chip.textContent;
+      inputEl.dispatchEvent(new Event('input'));
+      inputEl.focus();
+    });
+  });
+
+  // ── Send on Enter (Shift+Enter = newline) ────────────────────────────────
+  inputEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendBtn.click();
+    }
+  });
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+  function escapeHtml(str) {
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function linkify(text) {
+    // First, extract markdown links and bare URLs before escaping
+    const tokens = [];
+    let cursor = 0;
+    // Match markdown links [text](url) or bare URLs
+    const re = /\[([^\]]+)\]\((https?:\/\/[^)]+)\)|(https?:\/\/[^\s<>")\]]+)/g;
+    let m;
+    while ((m = re.exec(text)) !== null) {
+      if (m.index > cursor) tokens.push({ type: 'text', value: text.slice(cursor, m.index) });
+      if (m[1]) {
+        tokens.push({ type: 'link', label: m[1], url: m[2] });
+      } else {
+        tokens.push({ type: 'link', label: m[3], url: m[3] });
+      }
+      cursor = re.lastIndex;
+    }
+    if (cursor < text.length) tokens.push({ type: 'text', value: text.slice(cursor) });
+
+    return tokens.map(t => {
+      if (t.type === 'link') return `<a href="${escapeHtml(t.url)}" target="_blank" rel="noopener">${escapeHtml(t.label)}</a>`;
+      return escapeHtml(t.value);
+    }).join('');
+  }
+
+  function renderMarkdown(text) {
+    if (!text) return '';
+    if (!window.marked || !window.DOMPurify) {
+      return linkify(text).replace(/\n/g, '<br>');
+    }
+
+    const rendered = window.marked.parse(text, {
+      breaks: true,
+      gfm: true,
+    });
+    const sanitized = window.DOMPurify.sanitize(rendered);
+    const template = document.createElement('template');
+    template.innerHTML = sanitized;
+    template.content.querySelectorAll('a').forEach((anchor) => {
+      anchor.target = '_blank';
+      anchor.rel = 'noopener';
+    });
+    return template.innerHTML;
+  }
+
+  function appendBubble(role, text) {
+    const wrap = document.createElement('div');
+    wrap.className = `bubble-wrap ${role === 'user' ? 'user' : 'ai'}`;
+
+    const sender = document.createElement('div');
+    sender.className = 'sender';
+    sender.textContent = role === 'user' ? 'You' : 'Datawrapper Assistant';
+    wrap.appendChild(sender);
+
+    const bubble = document.createElement('div');
+    bubble.className = `bubble ${role === 'user' ? 'user' : 'ai'}`;
+    if (role === 'error') bubble.classList.add('error');
+    bubble.innerHTML = role === 'ai' ? renderMarkdown(text) : linkify(text);
+    wrap.appendChild(bubble);
+
+    chatEl.appendChild(wrap);
+    chatEl.scrollTop = chatEl.scrollHeight;
+    return wrap;
+  }
+
+  function appendToolCall(name, args, result, failed) {
+    const wrap = document.createElement('div');
+    wrap.className = 'tool-call';
+
+    const header = document.createElement('div');
+    header.className = 'tool-call-header';
+    const argsBtn = document.createElement('button');
+    argsBtn.className = 'args-toggle';
+    argsBtn.textContent = 'Show args';
+    const statusIcon = failed
+      ? `<svg class="tool-status" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#b0776a" stroke-width="2.5" aria-label="failed"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`
+      : `<svg class="tool-status" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6aaa7a" stroke-width="2.5" aria-label="success"><polyline points="20 6 9 17 4 12"/></svg>`;
+    header.innerHTML = `
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+      Tool call: <span class="tool-call-name">${escapeHtml(name)}</span>
+      ${statusIcon}
+    `;
+    const resultBtn = document.createElement('button');
+    resultBtn.className = 'args-toggle';
+    resultBtn.textContent = 'Show MCP response';
+    const btns = document.createElement('div');
+    btns.className = 'tool-call-btns';
+    btns.appendChild(argsBtn);
+    btns.appendChild(resultBtn);
+    header.appendChild(btns);
+    wrap.appendChild(header);
+
+    const argsSection = document.createElement('div');
+    argsSection.className = 'tool-call-args';
+    argsSection.innerHTML = `<div class="tool-call-section"><div class="tool-call-label">Arguments</div><div class="tool-call-pre">${escapeHtml(JSON.stringify(args, null, 2))}</div></div>`;
+    argsBtn.addEventListener('click', () => {
+      const open = argsSection.classList.toggle('open');
+      argsBtn.textContent = open ? 'Hide args' : 'Show args';
+    });
+    wrap.appendChild(argsSection);
+
+    const resultSection = document.createElement('div');
+    resultSection.className = 'tool-call-result collapsed';
+    resultSection.innerHTML = `<div class="tool-call-section"><div class="tool-call-label">MCP Response</div><div class="tool-call-pre">${linkify(result)}</div></div>`;
+    resultBtn.addEventListener('click', () => {
+      const hidden = resultSection.classList.toggle('collapsed');
+      resultBtn.textContent = hidden ? 'Show MCP response' : 'Hide MCP response';
+    });
+    wrap.appendChild(resultSection);
+
+    chatEl.appendChild(wrap);
+    chatEl.scrollTop = chatEl.scrollHeight;
+  }
+
+  function appendError(text) {
+    const wrap = document.createElement('div');
+    wrap.className = 'bubble-wrap ai';
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble error';
+    bubble.textContent = '⚠️ ' + text;
+    wrap.appendChild(bubble);
+    chatEl.appendChild(wrap);
+    chatEl.scrollTop = chatEl.scrollHeight;
+  }
+
+  function showTyping() {
+    const wrap = document.createElement('div');
+    wrap.className = 'bubble-wrap ai';
+    wrap.id = 'typing-indicator';
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble ai typing';
+    bubble.innerHTML = '<div class="dot"></div><div class="dot"></div><div class="dot"></div>';
+    wrap.appendChild(bubble);
+    chatEl.appendChild(wrap);
+    chatEl.scrollTop = chatEl.scrollHeight;
+  }
+
+  function hideTyping() {
+    const el = document.getElementById('typing-indicator');
+    if (el) el.remove();
+  }
+
+  // ── Send message ─────────────────────────────────────────────────────────
+  sendBtn.addEventListener('click', async () => {
+    const text = inputEl.value.trim();
+    if (!text || sendBtn.disabled) return;
+
+    // Hide welcome screen on first message
+    if (welcomeEl) welcomeEl.remove();
+
+    // Show user bubble
+    appendBubble('user', text);
+    history.push({ role: 'user', content: text });
+
+    // Clear input
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+
+    // Disable input while waiting
+    sendBtn.disabled = true;
+    inputEl.disabled = true;
+    showTyping();
+
+    try {
+      const payload = {
+        messages: history,
+        model: modelEl.value,
+      };
+      const apiKey = keyEl.value.trim();
+      if (apiKey) payload.openrouterKey = apiKey;
+      const dwToken = dwTokenEl.value.trim();
+      if (dwToken) payload.datawrapperToken = dwToken;
+
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      hideTyping();
+
+      if (!res.ok) {
+        appendError(data.error || `Server error ${res.status}`);
+        // Remove the failed user message from history so user can retry
+        history.pop();
+      } else {
+        if (data.toolCalls && data.toolCalls.length > 0) {
+          for (const tc of data.toolCalls) {
+            appendToolCall(tc.name, tc.args, tc.result, tc.failed);
+          }
+        }
+        const reply = data.reply || '';
+        const wrap = appendBubble('ai', reply);
+        // Render any images returned by MCP tools
+        if (data.images && data.images.length > 0) {
+          const bubble = wrap.querySelector('.bubble');
+          for (const img of data.images) {
+            const imgEl = document.createElement('img');
+            imgEl.src = `data:${img.mimeType};base64,${img.data}`;
+            imgEl.alt = 'Chart preview';
+            bubble.appendChild(imgEl);
+          }
+          chatEl.scrollTop = chatEl.scrollHeight;
+        }
+        // Keep the full server-returned conversation so follow-up turns retain
+        // tool calls and tool responses such as chart IDs.
+        if (Array.isArray(data.conversation) && data.conversation.length > 0) {
+          history = data.conversation.filter((message) => message.role !== 'system');
+        } else {
+          history.push({ role: 'assistant', content: reply });
+        }
+      }
+    } catch (err) {
+      hideTyping();
+      appendError('Network error: ' + err.message);
+      history.pop();
+    } finally {
+      sendBtn.disabled = false;
+      inputEl.disabled = false;
+      inputEl.focus();
+    }
+  });
+</script>
+</body>
+</html>
