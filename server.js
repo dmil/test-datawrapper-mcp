@@ -228,7 +228,10 @@ app.post('/api/chat', async (req, res) => {
     res.json(result);
   } catch (err) {
     console.error('Chat error:', err.message);
-    res.status(500).json({ error: err.message });
+    const friendly = err.message === 'fetch failed'
+      ? 'The Datawrapper service is temporarily busy. Please wait a moment and try again.'
+      : err.message;
+    res.status(500).json({ error: friendly });
   }
 });
 
