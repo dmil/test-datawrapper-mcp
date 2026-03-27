@@ -137,6 +137,7 @@ async function runAgentLoop(messages, datawrapperToken, openrouterKey, model) {
             typeof call.function.arguments === 'string'
               ? JSON.parse(call.function.arguments)
               : call.function.arguments;
+          delete args.access_token; // auth is handled via Authorization header
           try {
             const toolResult = await client.callTool({
               name: call.function.name,
