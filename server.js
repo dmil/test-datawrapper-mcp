@@ -35,14 +35,25 @@ async function createMCPClient(datawrapperToken) {
 
 async function listToolsAsOpenAI(client) {
   const result = await client.listTools();
-  return result.tools.map((tool) => ({
-    type: 'function',
-    function: {
-      name: tool.name,
-      description: tool.description,
-      parameters: tool.inputSchema,
-    },
-  }));
+  return result.tools.map((tool) => {
+    // Strip access_token from schema — auth is handled via the Authorization header
+    const schema = tool.inputSchema ? { ...tool.inputSchema } : {};
+    if (schema.properties) {
+      const { access_token, ...rest } = schema.properties;
+      schema.properties = rest;
+    }
+    if (Array.isArray(schema.required)) {
+      schema.required = schema.required.filter((k) => k !== 'access_token');
+    }
+    return {
+      type: 'function',
+      function: {
+        name: tool.name,
+        description: tool.description,
+        parameters: schema,
+      },
+    };
+  });
 }
 
 function extractContent(content) {
