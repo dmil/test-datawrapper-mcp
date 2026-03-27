@@ -195,6 +195,20 @@
     .tool-call-pre { white-space: pre-wrap; word-break: break-all; font-family: monospace; font-size: .8rem; color: var(--text); }
     .tool-call-pre a { color: var(--brand); text-decoration: underline; }
 
+    /* Usage stats */
+    .usage-stats {
+      font-size: .72rem; color: var(--muted); margin-top: 6px;
+      display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
+    }
+    .usage-stats span { white-space: nowrap; }
+    .cumulative-bar {
+      display: none; align-items: center; gap: 14px;
+      padding: 6px 20px; background: #fff; border-top: 1px solid var(--border);
+      font-size: .75rem; color: var(--muted); flex-wrap: wrap;
+    }
+    .cumulative-bar.visible { display: flex; }
+    .cumulative-bar span { white-space: nowrap; }
+
     /* Scrollbar */
     #chat::-webkit-scrollbar { width: 6px; }
     #chat::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
@@ -264,6 +278,13 @@
     </div>
   </div>
 
+  <!-- Cumulative usage bar -->
+  <div class="cumulative-bar" id="cumulative-bar">
+    <span><strong>Session totals:</strong></span>
+    <span>Tokens: <strong id="cum-tokens">0</strong></span>
+    <span>Cost: <strong id="cum-cost">$0.0000</strong></span>
+  </div>
+
   <!-- Input bar -->
   <div class="input-bar">
     <textarea id="user-input" rows="1" placeholder="Ask me to create a chart…" aria-label="Message input"></textarea>
@@ -318,6 +339,35 @@
 
   // Conversation history (without system prompt — server adds it)
   let history = [];
+
+  // Cumulative usage tracking
+  const cumulativeUsage = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0, cost: 0 };
+  const cumBar    = document.getElementById('cumulative-bar');
+  const cumTokens = document.getElementById('cum-tokens');
+  const cumCost   = document.getElementById('cum-cost');
+
+  function formatCost(c) { return '$' + c.toFixed(4); }
+
+  function updateCumulativeUsage(u) {
+    if (!u) return;
+    cumulativeUsage.prompt_tokens += u.prompt_tokens || 0;
+    cumulativeUsage.completion_tokens += u.completion_tokens || 0;
+    cumulativeUsage.total_tokens += u.total_tokens || 0;
+    cumulativeUsage.cost += u.cost || 0;
+    cumTokens.textContent = cumulativeUsage.total_tokens.toLocaleString();
+    cumCost.textContent = formatCost(cumulativeUsage.cost);
+    cumBar.classList.add('visible');
+  }
+
+  function createUsageStats(u) {
+    if (!u || !u.total_tokens) return null;
+    const div = document.createElement('div');
+    div.className = 'usage-stats';
+    div.innerHTML =
+      `<span>Tokens: ${(u.prompt_tokens||0).toLocaleString()} in / ${(u.completion_tokens||0).toLocaleString()} out</span>` +
+      (u.cost ? `<span>Cost: ${formatCost(u.cost)}</span>` : '');
+    return div;
+  }
 
   // ── Settings toggle ──────────────────────────────────────────────────────
   settingsToggle.addEventListener('click', () => {
@@ -560,6 +610,12 @@
             bubble.appendChild(imgEl);
           }
           chatEl.scrollTop = chatEl.scrollHeight;
+        }
+        // Show per-message usage stats
+        if (data.usage) {
+          const statsEl = createUsageStats(data.usage);
+          if (statsEl) wrap.appendChild(statsEl);
+          updateCumulativeUsage(data.usage);
         }
         // Keep the full server-returned conversation so follow-up turns retain
         // tool calls and tool responses such as chart IDs.
