@@ -122,11 +122,11 @@ async function runAgentLoop(messages, datawrapperToken, openrouterKey, model) {
       const toolResults = await Promise.all(
         message.tool_calls.map(async (call) => {
           let resultText;
+          const args =
+            typeof call.function.arguments === 'string'
+              ? JSON.parse(call.function.arguments)
+              : call.function.arguments;
           try {
-            const args =
-              typeof call.function.arguments === 'string'
-                ? JSON.parse(call.function.arguments)
-                : call.function.arguments;
             const toolResult = await client.callTool({
               name: call.function.name,
               arguments: args,
@@ -134,9 +134,10 @@ async function runAgentLoop(messages, datawrapperToken, openrouterKey, model) {
             const { text, images } = extractContent(toolResult.content);
             resultText = text;
             collectedImages.push(...images);
-            toolCallEvents.push({ name: call.function.name, args, result: resultText });
+            toolCallEvents.push({ name: call.function.name, args, result: resultText, failed: Boolean(toolResult.isError) });
           } catch (err) {
             resultText = `Tool error: ${err.message}`;
+            toolCallEvents.push({ name: call.function.name, args, result: resultText, failed: true });
           }
           return {
             role: 'tool',

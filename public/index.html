@@ -138,17 +138,19 @@
 
     /* Tool call bubbles */
     .tool-call {
-      align-self: flex-start; max-width: 76%;
+      align-self: flex-start; width: 76%;
       border: 1px solid var(--border); border-radius: var(--radius);
-      background: #f8fafc; font-size: .82rem; overflow: hidden;
+      background: #f8fafc; font-size: .82rem;
     }
     .tool-call-header {
       display: flex; align-items: center; gap: 8px;
       padding: 8px 12px; color: var(--muted); font-weight: 600;
+      border-radius: var(--radius) var(--radius) 0 0;
     }
     .tool-call-name { color: var(--brand); font-family: monospace; }
+    .tool-call-btns { display: flex; gap: 6px; margin-left: auto; }
     .args-toggle {
-      margin-left: auto; background: none; border: 1px solid var(--border);
+      background: none; border: 1px solid var(--border);
       border-radius: 6px; padding: 2px 8px; font-size: .75rem; cursor: pointer;
       color: var(--muted); white-space: nowrap;
     }
@@ -156,6 +158,8 @@
     .tool-call-args { display: none; border-top: 1px solid var(--border); }
     .tool-call-args.open { display: block; }
     .tool-call-result { border-top: 1px solid var(--border); }
+    .tool-call-result.collapsed { display: none; }
+    .tool-status { flex-shrink: 0; }
     .tool-call-section { padding: 8px 12px; }
     .tool-call-label { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-bottom: 4px; }
     .tool-call-pre { white-space: pre-wrap; word-break: break-all; font-family: monospace; font-size: .8rem; color: var(--text); }
@@ -366,7 +370,7 @@
     return wrap;
   }
 
-  function appendToolCall(name, args, result) {
+  function appendToolCall(name, args, result, failed) {
     const wrap = document.createElement('div');
     wrap.className = 'tool-call';
 
@@ -375,11 +379,22 @@
     const argsBtn = document.createElement('button');
     argsBtn.className = 'args-toggle';
     argsBtn.textContent = 'Show args';
+    const statusIcon = failed
+      ? `<svg class="tool-status" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#b0776a" stroke-width="2.5" aria-label="failed"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`
+      : `<svg class="tool-status" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6aaa7a" stroke-width="2.5" aria-label="success"><polyline points="20 6 9 17 4 12"/></svg>`;
     header.innerHTML = `
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
       Tool call: <span class="tool-call-name">${escapeHtml(name)}</span>
+      ${statusIcon}
     `;
-    header.appendChild(argsBtn);
+    const resultBtn = document.createElement('button');
+    resultBtn.className = 'args-toggle';
+    resultBtn.textContent = failed ? 'Show result' : 'Hide result';
+    const btns = document.createElement('div');
+    btns.className = 'tool-call-btns';
+    btns.appendChild(argsBtn);
+    btns.appendChild(resultBtn);
+    header.appendChild(btns);
     wrap.appendChild(header);
 
     const argsSection = document.createElement('div');
@@ -392,8 +407,12 @@
     wrap.appendChild(argsSection);
 
     const resultSection = document.createElement('div');
-    resultSection.className = 'tool-call-result';
+    resultSection.className = `tool-call-result${failed ? ' collapsed' : ''}`;
     resultSection.innerHTML = `<div class="tool-call-section"><div class="tool-call-label">Result</div><div class="tool-call-pre">${linkify(result)}</div></div>`;
+    resultBtn.addEventListener('click', () => {
+      const hidden = resultSection.classList.toggle('collapsed');
+      resultBtn.textContent = hidden ? 'Show result' : 'Hide result';
+    });
     wrap.appendChild(resultSection);
 
     chatEl.appendChild(wrap);
@@ -475,7 +494,7 @@
       } else {
         if (data.toolCalls && data.toolCalls.length > 0) {
           for (const tc of data.toolCalls) {
-            appendToolCall(tc.name, tc.args, tc.result);
+            appendToolCall(tc.name, tc.args, tc.result, tc.failed);
           }
         }
         const reply = data.reply || '';
