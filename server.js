@@ -79,6 +79,7 @@ async function runAgentLoop(messages, datawrapperToken, openrouterKey, model) {
     ];
 
     const collectedImages = [];
+    const toolCallEvents = [];
     const MAX_AGENT_LOOP_ITERATIONS = 15;
     for (let i = 0; i < MAX_AGENT_LOOP_ITERATIONS; i++) {
       const body = {
@@ -114,7 +115,7 @@ async function runAgentLoop(messages, datawrapperToken, openrouterKey, model) {
 
       // No tool calls — we have the final answer
       if (!message.tool_calls || message.tool_calls.length === 0) {
-        return { reply: message.content, images: collectedImages, conversation };
+        return { reply: message.content, images: collectedImages, conversation, toolCalls: toolCallEvents };
       }
 
       // Execute every tool call and append results
@@ -133,6 +134,7 @@ async function runAgentLoop(messages, datawrapperToken, openrouterKey, model) {
             const { text, images } = extractContent(toolResult.content);
             resultText = text;
             collectedImages.push(...images);
+            toolCallEvents.push({ name: call.function.name, args, result: resultText });
           } catch (err) {
             resultText = `Tool error: ${err.message}`;
           }
