@@ -12,7 +12,7 @@ app.use('/vendor/dompurify', express.static('node_modules/dompurify/dist'));
 const MCP_URL = process.env.MCP_URL || 'https://datawrapper-mcp.fly.dev/mcp';
 const SERVER_OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
 const SERVER_DATAWRAPPER_TOKEN = process.env.DATAWRAPPER_TOKEN || '';
-const DEFAULT_MODEL = process.env.MODEL || 'anthropic/claude-3-haiku';
+const DEFAULT_MODEL = process.env.MODEL || 'google/gemini-2.5-flash-preview';
 const PORT = process.env.PORT || 3000;
 
 const SYSTEM_PROMPT =
