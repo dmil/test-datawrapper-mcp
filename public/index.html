@@ -138,6 +138,8 @@
       transition: background .15s, border-color .15s;
     }
     .example-chip:hover { background: var(--brand); color: #fff; border-color: var(--brand); }
+    .demo-chip { background: var(--brand); color: #fff; border-color: var(--brand); font-weight: 600; }
+    .demo-chip:hover { background: var(--brand-d); border-color: var(--brand-d); }
 
     /* ── Input bar ── */
     .input-bar {
@@ -272,8 +274,14 @@
       <h2>👋 Welcome to Datawrapper MCP</h2>
       <p>Ask me to create, edit, or publish Datawrapper charts. I'll use the Datawrapper API on your behalf.</p>
       <div class="examples">
-        <button class="example-chip">Create a bar chart with sample data</button>
+        <button class="example-chip demo-chip" data-prompt="Make me a chart Overall Volume by Borough
 
+Brooklyn: 19,299 complaints (31%)
+Queens: 15,597 complaints (25%)
+Bronx: 12,678 complaints (20%)
+Manhattan: 12,139 complaints (19%)
+Staten Island: 2,728 complaints (4%)">Demo: NYC Complaints by Borough</button>
+        <button class="example-chip">Create a bar chart with sample data</button>
         <button class="example-chip">Create a line chart showing monthly sales</button>
         <button class="example-chip">What Datawrapper tools are available?</button>
       </div>
@@ -390,7 +398,7 @@
   // ── Example chips ────────────────────────────────────────────────────────
   document.querySelectorAll('.example-chip').forEach(chip => {
     chip.addEventListener('click', () => {
-      inputEl.value = chip.textContent;
+      inputEl.value = chip.dataset.prompt || chip.textContent;
       inputEl.dispatchEvent(new Event('input'));
       inputEl.focus();
     });
