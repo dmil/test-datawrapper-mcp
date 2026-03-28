@@ -46,7 +46,7 @@
     /* ── Settings panel ── */
     #settings-panel {
       background: #fff; border-bottom: 1px solid var(--border);
-      padding: 16px 20px; display: none; flex-direction: column; gap: 12px;
+      padding: 16px 20px; display: flex; flex-direction: column; gap: 12px;
     }
     #settings-panel.open { display: flex; }
     .settings-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
@@ -229,14 +229,14 @@
       </svg>
       <h1>Datawrapper MCP Chat</h1>
     </div>
-    <button class="settings-btn" id="settings-toggle" aria-expanded="false" aria-controls="settings-panel">
+    <button class="settings-btn" id="settings-toggle" aria-expanded="true" aria-controls="settings-panel">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       Settings
     </button>
   </header>
 
   <!-- Settings panel -->
-  <div id="settings-panel" role="region" aria-label="Settings">
+  <div id="settings-panel" class="open" role="region" aria-label="Settings">
     <div class="settings-row">
       <div class="field">
         <label for="openrouter-key">OpenRouter API Key</label>
