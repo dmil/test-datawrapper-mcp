@@ -32,7 +32,7 @@ All settings are optional environment variables (see [`.env.example`](.env.examp
 | Variable | Default | Description |
 |---|---|---|
 | `OPENROUTER_API_KEY` | _(none)_ | Pre-shared OpenRouter key. If blank, each user must enter their own in the Settings panel. |
-| `MODEL` | `anthropic/claude-3.5-sonnet` | Any [OpenRouter model](https://openrouter.ai/models) that supports tool use. |
+| `MODEL` | `google/gemini-3.8-flash` | Any [OpenRouter model](https://openrouter.ai/models) that supports tool use. |
 | `MCP_URL` | `https://datawrapper-mcp.fly.dev/mcp` | Datawrapper MCP server URL. |
 | `PORT` | `3000` | Port the web server listens on. |
 

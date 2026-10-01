@@ -258,10 +258,10 @@
       <div class="field">
         <label for="model-select">Model</label>
         <select id="model-select" data-persist>
-          <option value="google/gemini-2.5-flash">Gemini 2.5 Flash</option>
-          <option value="anthropic/claude-3-haiku">Claude 3 Haiku</option>
-          <option value="nvidia/nemotron-3-super-120b-a12b">Nemotron 3 Super 120B</option>
-          <option value="anthropic/claude-sonnet-4-5">Claude Sonnet 4.5</option>
+          <option value="google/gemini-3.8-flash">Gemini 3.8 Flash</option>
+          <option value="anthropic/claude-haiku-4.5">Claude Haiku 4.5</option>
+          <option value="anthropic/claude-sonnet-5.5">Claude Sonnet 5.5</option>
+          <option value="openai/gpt-5-mini">GPT-5 Mini</option>
         </select>
       </div>
     </div>
@@ -324,7 +324,15 @@ Staten Island: 2,728 complaints (4%)">Demo: NYC 311 Complaints by Borough</butto
   document.querySelectorAll('[data-persist]').forEach(el => {
     const key = 'dw-mcp-' + el.id;
     const saved = sessionStorage.getItem(key);
-    if (saved) el.value = saved;
+    if (saved) {
+      const restored = el.id === 'model-select'
+        ? saved === 'google/gemini-2.5-flash'
+          ? 'google/gemini-3.8-flash'
+          : [...el.options].some(option => option.value === saved) ? saved : el.options[0].value
+        : saved;
+      el.value = restored;
+      if (restored !== saved) sessionStorage.setItem(key, restored);
+    }
     el.addEventListener('change', () => sessionStorage.setItem(key, el.value));
     if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') {
       el.addEventListener('input', () => sessionStorage.setItem(key, el.value));
