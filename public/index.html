@@ -274,20 +274,12 @@
   <div id="chat" role="log" aria-live="polite" aria-label="Chat messages">
     <div class="welcome" id="welcome">
       <h2>👋 Welcome to Datawrapper MCP</h2>
-      <p>Ask me to create, edit, or publish Datawrapper charts. I'll use the Datawrapper API on your behalf.</p>
+      <p>Ask me to find public data on Socrata open data portals, or to create, edit, or publish Datawrapper charts. I'll use the Socrata and Datawrapper APIs on your behalf.</p>
       <div class="examples">
-        <button class="example-chip demo-chip" data-prompt="Make me a chart of this data. 311 Complaint Breakdown by Borough (Past Week: Feb 27 - Mar 6, 2026)
-Based on data from the NYC 311 Service Requests dataset (erm2-nwe9), here's the breakdown of complaint types by borough for the past week:
-Overall Volume by Borough
-
-Brooklyn: 19,299 complaints (31%)
-Queens: 15,597 complaints (25%)
-Bronx: 12,678 complaints (20%)
-Manhattan: 12,139 complaints (19%)
-Staten Island: 2,728 complaints (4%)">Demo: NYC 311 Complaints by Borough</button>
-        <button class="example-chip">Create a bar chart with sample data</button>
-        <button class="example-chip">Create a line chart showing monthly sales</button>
-        <button class="example-chip">What Datawrapper tools are available?</button>
+        <button class="example-chip">What tools are available?</button>
+        <button class="example-chip">What datasets exist about trees?</button>
+        <button class="example-chip">Chart NYC 311 complaints by borough for the past week</button>
+        <button class="example-chip">Restaurant inspection grades by NYC borough</button>
       </div>
     </div>
   </div>
@@ -497,7 +489,7 @@ Staten Island: 2,728 complaints (4%)">Demo: NYC 311 Complaints by Borough</butto
     return wrap;
   }
 
-  function appendToolCall(name, args, result, failed) {
+  function appendToolCall(name, args, result, failed, server) {
     const wrap = document.createElement('div');
     wrap.className = 'tool-call';
 
@@ -511,7 +503,7 @@ Staten Island: 2,728 complaints (4%)">Demo: NYC 311 Complaints by Borough</butto
       : `<svg class="tool-status" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6aaa7a" stroke-width="2.5" aria-label="success"><polyline points="20 6 9 17 4 12"/></svg>`;
     header.innerHTML = `
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-      Tool call: <span class="tool-call-name">${escapeHtml(name)}</span>
+      Tool call: <span class="tool-call-name">${server ? escapeHtml(server) + ' · ' : ''}${escapeHtml(name)}</span>
       ${statusIcon}
     `;
     const resultBtn = document.createElement('button');
@@ -612,7 +604,7 @@ Staten Island: 2,728 complaints (4%)">Demo: NYC 311 Complaints by Borough</butto
         body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({ error: `Server error ${res.status} (${res.statusText || 'non-JSON response'})` }));
       const elapsed = ((performance.now() - t0) / 1000).toFixed(1);
       hideTyping();
 
@@ -623,7 +615,7 @@ Staten Island: 2,728 complaints (4%)">Demo: NYC 311 Complaints by Borough</butto
       } else {
         if (data.toolCalls && data.toolCalls.length > 0) {
           for (const tc of data.toolCalls) {
-            appendToolCall(tc.name, tc.args, tc.result, tc.failed);
+            appendToolCall(tc.name, tc.args, tc.result, tc.failed, tc.server);
           }
         }
         const reply = data.reply || '';
