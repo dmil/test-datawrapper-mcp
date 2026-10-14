@@ -30,6 +30,22 @@ const SOCRATA_PROMPT =
   'dataset, query it with SoQL (aggregate on the portal with select/group/where rather than pulling raw rows), ' +
   'and cite the dataset you used. When they want a chart of that data, pass the query results to Datawrapper.';
 
+// ----- Network helpers ----------------------------------------------------
+
+// Node's fetch reports every network-level failure (DNS, refused, reset, a
+// stale keep-alive socket closed by a proxy) as a bare "fetch failed" with the
+// real reason in err.cause. Name the service that failed and surface the reason.
+async function labelNetworkErrors(service, fn) {
+  try {
+    return await fn();
+  } catch (err) {
+    const isNetwork = err.message === 'fetch failed' || err.cause?.code;
+    if (!isNetwork) throw err;
+    const reason = err.cause?.code || err.cause?.message || err.message;
+    throw new Error(`Couldn't reach ${service} (${reason}).`, { cause: err.cause });
+  }
+}
+
 // ----- MCP helpers --------------------------------------------------------
 
 async function createMCPClient(url, requestInit = {}) {
@@ -48,8 +64,10 @@ async function connectServers(datawrapperToken) {
     ? { headers: { Authorization: `Bearer ${datawrapperToken}` } }
     : {};
   const [datawrapper, socrata] = await Promise.allSettled([
-    createMCPClient(MCP_URL, datawrapperInit),
-    SOCRATA_MCP_URL ? createMCPClient(SOCRATA_MCP_URL) : Promise.resolve(null),
+    labelNetworkErrors('the Datawrapper MCP server', () => createMCPClient(MCP_URL, datawrapperInit)),
+    SOCRATA_MCP_URL
+      ? labelNetworkErrors('the Socrata MCP server', () => createMCPClient(SOCRATA_MCP_URL))
+      : Promise.resolve(null),
   ]);
 
   const servers = [];
@@ -150,7 +168,7 @@ async function runAgentLoop(messages, datawrapperToken, openrouterKey, model) {
         body.tools = tools;
       }
 
-      const response = await fetch(
+      const response = await labelNetworkErrors('OpenRouter', () => fetch(
         'https://openrouter.ai/api/v1/chat/completions',
         {
           method: 'POST',
@@ -162,7 +180,7 @@ async function runAgentLoop(messages, datawrapperToken, openrouterKey, model) {
           },
           body: JSON.stringify(body),
         }
-      );
+      ));
 
       if (!response.ok) {
         const errText = await response.text();
@@ -276,11 +294,8 @@ app.post('/api/chat', async (req, res) => {
     );
     res.json(result);
   } catch (err) {
-    console.error('Chat error:', err.message);
-    const friendly = err.message === 'fetch failed'
-      ? 'The Datawrapper service is temporarily busy. Please wait a moment and try again.'
-      : err.message;
-    res.status(500).json({ error: friendly });
+    console.error('Chat error:', err.message, err.cause ?? '');
+    res.status(500).json({ error: err.message });
   }
 });
 
