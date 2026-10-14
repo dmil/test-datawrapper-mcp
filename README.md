@@ -34,6 +34,7 @@ All settings are optional environment variables (see [`.env.example`](.env.examp
 | `OPENROUTER_API_KEY` | _(none)_ | Pre-shared OpenRouter key. If blank, each user must enter their own in the Settings panel. |
 | `MODEL` | `anthropic/claude-haiku-5.5` | Any [OpenRouter model](https://openrouter.ai/models) that supports tool use. |
 | `MCP_URL` | `https://datawrapper-mcp.fly.dev/mcp` | Datawrapper MCP server URL. |
+| `SOCRATA_MCP_URL` | `https://socrata-mcp.civicaitools.org/mcp` | [Socrata MCP server](https://github.com/npstorey/socrata-mcp-server) URL for querying open data portals. Set to an empty value to disable. |
 | `PORT` | `3000` | Port the web server listens on. |
 
 ### Settings panel
