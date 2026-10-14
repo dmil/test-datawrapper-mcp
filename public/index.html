@@ -46,7 +46,7 @@
     /* ── Settings panel ── */
     #settings-panel {
       background: #fff; border-bottom: 1px solid var(--border);
-      padding: 16px 20px; display: none; flex-direction: column; gap: 12px;
+      padding: 16px 20px; display: flex; flex-direction: column; gap: 12px;
     }
     #settings-panel.open { display: flex; }
     .settings-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
@@ -138,6 +138,8 @@
       transition: background .15s, border-color .15s;
     }
     .example-chip:hover { background: var(--brand); color: #fff; border-color: var(--brand); }
+    .demo-chip { background: var(--brand); color: #fff; border-color: var(--brand); font-weight: 600; }
+    .demo-chip:hover { background: var(--brand-d); border-color: var(--brand-d); }
 
     /* ── Input bar ── */
     .input-bar {
@@ -195,6 +197,20 @@
     .tool-call-pre { white-space: pre-wrap; word-break: break-all; font-family: monospace; font-size: .8rem; color: var(--text); }
     .tool-call-pre a { color: var(--brand); text-decoration: underline; }
 
+    /* Usage stats */
+    .usage-stats {
+      font-size: .72rem; color: var(--muted); margin-top: 6px;
+      display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
+    }
+    .usage-stats span { white-space: nowrap; }
+    .cumulative-bar {
+      display: none; align-items: center; gap: 14px;
+      padding: 6px 20px; background: #fff; border-top: 1px solid var(--border);
+      font-size: .75rem; color: var(--muted); flex-wrap: wrap;
+    }
+    .cumulative-bar.visible { display: flex; }
+    .cumulative-bar span { white-space: nowrap; }
+
     /* Scrollbar */
     #chat::-webkit-scrollbar { width: 6px; }
     #chat::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
@@ -215,14 +231,15 @@
       </svg>
       <h1>Datawrapper MCP Chat</h1>
     </div>
-    <button class="settings-btn" id="settings-toggle" aria-expanded="false" aria-controls="settings-panel">
+    <a href="https://docs.google.com/presentation/d/1GCXWPhX3y7Ges477vNDmHUx0pu-Dz-U9RN37hOtAMuA/edit?slide=id.g3967d44042e_2_0#slide=id.g3967d44042e_2_0" target="_blank" rel="noopener" class="settings-btn" style="text-decoration:none;">Session Slides</a>
+    <button class="settings-btn" id="settings-toggle" aria-expanded="true" aria-controls="settings-panel">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       Settings
     </button>
   </header>
 
   <!-- Settings panel -->
-  <div id="settings-panel" role="region" aria-label="Settings">
+  <div id="settings-panel" class="open" role="region" aria-label="Settings">
     <div class="settings-row">
       <div class="field">
         <label for="openrouter-key">OpenRouter API Key</label>
@@ -241,7 +258,10 @@
       <div class="field">
         <label for="model-select">Model</label>
         <select id="model-select" data-persist>
-          <option value="anthropic/claude-3-haiku">Claude 3 Haiku</option>
+          <option value="google/gemini-3.8-flash">Gemini 3.8 Flash</option>
+          <option value="anthropic/claude-haiku-4.5">Claude Haiku 4.5</option>
+          <option value="anthropic/claude-sonnet-5.5">Claude Sonnet 5.5</option>
+          <option value="openai/gpt-5-mini">GPT-5 Mini</option>
         </select>
       </div>
     </div>
@@ -256,12 +276,27 @@
       <h2>👋 Welcome to Datawrapper MCP</h2>
       <p>Ask me to create, edit, or publish Datawrapper charts. I'll use the Datawrapper API on your behalf.</p>
       <div class="examples">
-        <button class="example-chip">Create a bar chart with sample data</button>
+        <button class="example-chip demo-chip" data-prompt="Make me a chart of this data. 311 Complaint Breakdown by Borough (Past Week: Feb 27 - Mar 6, 2026)
+Based on data from the NYC 311 Service Requests dataset (erm2-nwe9), here's the breakdown of complaint types by borough for the past week:
+Overall Volume by Borough
 
+Brooklyn: 19,299 complaints (31%)
+Queens: 15,597 complaints (25%)
+Bronx: 12,678 complaints (20%)
+Manhattan: 12,139 complaints (19%)
+Staten Island: 2,728 complaints (4%)">Demo: NYC 311 Complaints by Borough</button>
+        <button class="example-chip">Create a bar chart with sample data</button>
         <button class="example-chip">Create a line chart showing monthly sales</button>
         <button class="example-chip">What Datawrapper tools are available?</button>
       </div>
     </div>
+  </div>
+
+  <!-- Cumulative usage bar -->
+  <div class="cumulative-bar" id="cumulative-bar">
+    <span><strong>Session totals:</strong></span>
+    <span>Tokens: <strong id="cum-tokens">0</strong></span>
+    <span>Cost: <strong id="cum-cost">$0.0000</strong></span>
   </div>
 
   <!-- Input bar -->
@@ -289,7 +324,15 @@
   document.querySelectorAll('[data-persist]').forEach(el => {
     const key = 'dw-mcp-' + el.id;
     const saved = sessionStorage.getItem(key);
-    if (saved) el.value = saved;
+    if (saved) {
+      const restored = el.id === 'model-select'
+        ? saved === 'google/gemini-2.5-flash'
+          ? 'google/gemini-3.8-flash'
+          : [...el.options].some(option => option.value === saved) ? saved : el.options[0].value
+        : saved;
+      el.value = restored;
+      if (restored !== saved) sessionStorage.setItem(key, restored);
+    }
     el.addEventListener('change', () => sessionStorage.setItem(key, el.value));
     if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') {
       el.addEventListener('input', () => sessionStorage.setItem(key, el.value));
@@ -319,6 +362,39 @@
   // Conversation history (without system prompt — server adds it)
   let history = [];
 
+  // Cumulative usage tracking
+  const cumulativeUsage = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0, cost: 0 };
+  const cumBar    = document.getElementById('cumulative-bar');
+  const cumTokens = document.getElementById('cum-tokens');
+  const cumCost   = document.getElementById('cum-cost');
+
+  function formatCost(c) { return '$' + c.toFixed(4); }
+
+  function updateCumulativeUsage(u) {
+    if (!u) return;
+    cumulativeUsage.prompt_tokens += u.prompt_tokens || 0;
+    cumulativeUsage.completion_tokens += u.completion_tokens || 0;
+    cumulativeUsage.total_tokens += u.total_tokens || 0;
+    cumulativeUsage.cost += u.cost || 0;
+    cumTokens.textContent = cumulativeUsage.total_tokens.toLocaleString();
+    cumCost.textContent = formatCost(cumulativeUsage.cost);
+    cumBar.classList.add('visible');
+  }
+
+  function createUsageStats(u, elapsed) {
+    if ((!u || !u.total_tokens) && !elapsed) return null;
+    const div = document.createElement('div');
+    div.className = 'usage-stats';
+    let html = '';
+    if (elapsed) html += `<span>${elapsed}s</span>`;
+    if (u && u.total_tokens) {
+      html += `<span>Tokens: ${(u.prompt_tokens||0).toLocaleString()} in / ${(u.completion_tokens||0).toLocaleString()} out</span>`;
+      if (u.cost) html += `<span>Cost: ${formatCost(u.cost)}</span>`;
+    }
+    div.innerHTML = html;
+    return div;
+  }
+
   // ── Settings toggle ──────────────────────────────────────────────────────
   settingsToggle.addEventListener('click', () => {
     const open = settingsPanel.classList.toggle('open');
@@ -334,7 +410,7 @@
   // ── Example chips ────────────────────────────────────────────────────────
   document.querySelectorAll('.example-chip').forEach(chip => {
     chip.addEventListener('click', () => {
-      inputEl.value = chip.textContent;
+      inputEl.value = chip.dataset.prompt || chip.textContent;
       inputEl.dispatchEvent(new Event('input'));
       inputEl.focus();
     });
@@ -529,6 +605,7 @@
       const dwToken = dwTokenEl.value.trim();
       if (dwToken) payload.datawrapperToken = dwToken;
 
+      const t0 = performance.now();
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -536,6 +613,7 @@
       });
 
       const data = await res.json();
+      const elapsed = ((performance.now() - t0) / 1000).toFixed(1);
       hideTyping();
 
       if (!res.ok) {
@@ -561,6 +639,10 @@
           }
           chatEl.scrollTop = chatEl.scrollHeight;
         }
+        // Show per-message usage stats
+        const statsEl = createUsageStats(data.usage, elapsed);
+        if (statsEl) wrap.appendChild(statsEl);
+        if (data.usage) updateCumulativeUsage(data.usage);
         // Keep the full server-returned conversation so follow-up turns retain
         // tool calls and tool responses such as chart IDs.
         if (Array.isArray(data.conversation) && data.conversation.length > 0) {
